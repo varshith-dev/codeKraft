@@ -10,7 +10,7 @@ import Auth from './pages/Auth'
 export default function App() {
   const [session, setSession] = useState(null)
 
-  useEffect(() => {
+  useEffect(() => { 
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
