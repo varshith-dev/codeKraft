@@ -6,6 +6,15 @@ import { supabase } from '../supabaseClient'
  */
 
 /**
+ * Get the application URL for email redirects
+ * Uses environment variable if set, otherwise falls back to window.location.origin
+ * @returns {string} Application URL
+ */
+const getAppUrl = () => {
+    return import.meta.env.VITE_APP_URL || window.location.origin
+}
+
+/**
  * Sign up a new user with email and password
  * @param {string} email - User's email
  * @param {string} password - User's password
@@ -19,7 +28,7 @@ export async function signUpWithEmail(email, password, metadata = {}) {
             password,
             options: {
                 data: metadata,
-                emailRedirectTo: `${window.location.origin}/verify-email`
+                emailRedirectTo: `${getAppUrl()}/verify-email`
             }
         })
 
@@ -81,7 +90,7 @@ export async function sendOTP(email) {
         const { error } = await supabase.auth.signInWithOtp({
             email,
             options: {
-                emailRedirectTo: window.location.origin
+                emailRedirectTo: getAppUrl()
             }
         })
 
@@ -123,7 +132,7 @@ export async function verifyOTP(email, token) {
 export async function sendPasswordReset(email) {
     try {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/reset-password`
+            redirectTo: `${getAppUrl()}/reset-password`
         })
 
         if (error) throw error
