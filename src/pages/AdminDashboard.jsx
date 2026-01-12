@@ -8,46 +8,107 @@ import toast from 'react-hot-toast'
 
 export default function AdminDashboard({ session }) {
     const [loading, setLoading] = useState(true)
-    const [stats, setStats] = useState({})
+    const [stats, setStats] = useState({
+        users: 0,
+        posts: 0,
+        likes: 0,
+        comments: 0
+    })
     const [topPosts, setTopPosts] = useState([])
     const [selectedPost, setSelectedPost] = useState(null)
     const [postInsights, setPostInsights] = useState(null)
     const [searchParams] = useSearchParams()
+    const [isAdmin, setIsAdmin] = useState(false)
 
     useEffect(() => {
-        fetchStats()
-        fetchTopPosts()
+        checkAdminStatus()
+    }, [session])
 
-        const postId = searchParams.get('post')
-        if (postId) {
-            fetchPostInsights(postId)
+    useEffect(() => {
+        if (isAdmin !== null) {
+            fetchStats()
+            fetchTopPosts()
+
+            const postId = searchParams.get('post')
+            if (postId) {
+                fetchPostInsights(postId)
+            }
         }
-    }, [searchParams])
+    }, [searchParams, isAdmin])
+
+    const checkAdminStatus = async () => {
+        try {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('is_admin')
+                .eq('id', session.user.id)
+                .single()
+
+            setIsAdmin(profile?.is_admin || false)
+        } catch (error) {
+            console.error('Error checking admin status:', error)
+            setIsAdmin(false)
+        }
+    }
 
     const fetchStats = async () => {
         try {
-            // Get total users
-            const { count: usersCount } = await supabase
-                .from('profiles')
-                .select('*', { count: 'exact', head: true })
+            // For non-admins, only show their own stats
+            const userFilter = isAdmin ? {} : { user_id: session.user.id }
 
-            // Get total posts
-            const { count: postsCount } = await supabase
+            // Get total users (only for admins)
+            let usersCount = 0
+            if (isAdmin) {
+                const { count } = await supabase
+                    .from('profiles')
+                    .select('*', { count: 'exact', head: true })
+                usersCount = count || 0
+            }
+
+            // Get total posts (filtered for non-admins)
+            const postsQuery = supabase
                 .from('posts')
                 .select('*', { count: 'exact', head: true })
 
-            // Get total likes
-            const { count: likesCount } = await supabase
-                .from('likes')
-                .select('*', { count: 'exact', head: true })
+            if (!isAdmin) {
+                postsQuery.eq('user_id', session.user.id)
+            }
+            const { count: postsCount } = await postsQuery
 
-            // Get total comments
-            const { count: commentsCount } = await supabase
+            // Get total likes (filtered for non-admins)
+            const likesQuery = supabase
+                .from('likes')
+                .select('post_id', { count: 'exact', head: true })
+
+            if (!isAdmin) {
+                // Get likes only on user's posts
+                const { data: userPosts } = await supabase
+                    .from('posts')
+                    .select('id')
+                    .eq('user_id', session.user.id)
+                const postIds = userPosts?.map(p => p.id) || []
+                likesQuery.in('post_id', postIds)
+            }
+            const { count: likesCount } = await likesQuery
+
+            // Get total comments (filtered for non-admins)
+            const commentsQuery = supabase
                 .from('comments')
-                .select('*', { count: 'exact', head: true })
+                .select('post_id', { count: 'exact', head: true })
+
+            if (!isAdmin) {
+                // Get comments only on user's posts
+                const { data: userPosts } = await supabase
+                    .from('posts')
+                    .select('id')
+                    .eq('user_id', session.user.id)
+                const postIds = userPosts?.map(p => p.id) || []
+                commentsQuery.in('post_id', postIds)
+            }
+            const { count: commentsCount } = await commentsQuery
 
             setStats({
-                users: usersCount || 0,
+                users: usersCount,
                 posts: postsCount || 0,
                 likes: likesCount || 0,
                 comments: commentsCount || 0
@@ -61,8 +122,8 @@ export default function AdminDashboard({ session }) {
         try {
             setLoading(true)
 
-            // Fetch posts with analytics
-            const { data: posts } = await supabase
+            // Fetch posts with analytics - filter by user unless admin
+            const postsQuery = supabase
                 .from('posts')
                 .select(`
           *,
@@ -71,6 +132,13 @@ export default function AdminDashboard({ session }) {
         `)
                 .order('created_at', { ascending: false })
                 .limit(10)
+
+            // Filter by user_id if not admin
+            if (!isAdmin) {
+                postsQuery.eq('user_id', session.user.id)
+            }
+
+            const { data: posts } = await postsQuery
 
             // Get like counts
             const postIds = posts?.map(p => p.id) || []
@@ -127,6 +195,12 @@ export default function AdminDashboard({ session }) {
                 return
             }
 
+            // Check if user owns this post or is admin
+            if (!isAdmin && post.user_id !== session.user.id) {
+                toast.error('You can only view analytics for your own posts')
+                return
+            }
+
             // Get detailed counts
             const { count: likesCount } = await supabase
                 .from('likes')
@@ -157,33 +231,39 @@ export default function AdminDashboard({ session }) {
     return (
         <div className="max-w-7xl mx-auto space-y-8 animate-fade-in">
             <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-                <p className="text-gray-500">Platform overview and analytics</p>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                    {isAdmin ? 'Admin Dashboard' : 'My Post Analytics'}
+                </h1>
+                <p className="text-gray-500">
+                    {isAdmin ? 'Platform overview and analytics' : 'View analytics for your posts'}
+                </p>
             </div>
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    icon={<Users className="text-blue-600" />}
-                    title="Total Users"
-                    value={stats.users}
-                    bgColor="bg-blue-50"
-                />
+                {isAdmin && (
+                    <StatCard
+                        icon={<Users className="text-blue-600" />}
+                        title="Total Users"
+                        value={stats.users}
+                        bgColor="bg-blue-50"
+                    />
+                )}
                 <StatCard
                     icon={<FileText className="text-purple-600" />}
-                    title="Total Posts"
+                    title={isAdmin ? "Total Posts" : "Your Posts"}
                     value={stats.posts}
                     bgColor="bg-purple-50"
                 />
                 <StatCard
                     icon={<Heart className="text-pink-600" />}
-                    title="Total Likes"
+                    title={isAdmin ? "Total Likes" : "Your Likes"}
                     value={stats.likes}
                     bgColor="bg-pink-50"
                 />
                 <StatCard
                     icon={<MessageCircle className="text-green-600" />}
-                    title="Total Comments"
+                    title={isAdmin ? "Total Comments" : "Your Comments"}
                     value={stats.comments}
                     bgColor="bg-green-50"
                 />
@@ -233,7 +313,9 @@ export default function AdminDashboard({ session }) {
             {/* Top Posts Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
-                    <h2 className="text-xl font-bold text-gray-900">Recent Posts</h2>
+                    <h2 className="text-xl font-bold text-gray-900">
+                        {isAdmin ? 'Recent Posts' : 'Your Recent Posts'}
+                    </h2>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -306,7 +388,7 @@ function StatCard({ icon, title, value, bgColor }) {
                 {icon}
             </div>
             <h3 className="text-gray-500 text-sm font-medium mb-1">{title}</h3>
-            <p className="text-3xl font-bold text-gray-900">{value.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-gray-900">{(value || 0).toLocaleString()}</p>
         </div>
     )
 }

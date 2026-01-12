@@ -381,12 +381,12 @@ export default function Feed({ session }) {
                 </button>
               </div>
 
-              {/* Admin insights button */}
-              {session?.user && (
+              {/* Analytics button - only visible to post author */}
+              {session?.user?.id === post.user_id && (
                 <Link
                   to={`/admin?post=${post.id}`}
                   className="text-gray-400 hover:text-blue-600 transition-colors p-2"
-                  title="View insights"
+                  title="View your post analytics"
                 >
                   <BarChart3 size={18} />
                 </Link>

@@ -208,6 +208,40 @@ npm run lint     # Run ESLint
 
 ---
 
+## 🚢 Deployment
+
+The app is configured for easy deployment to Vercel or Netlify with proper SPA routing support.
+
+### Deploy to Vercel
+
+1. Push your code to GitHub
+2. Go to [Vercel](https://vercel.com) and import your repository
+3. Vercel will automatically detect the Vite configuration
+4. Add your environment variables:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+5. Deploy!
+
+The `vercel.json` file ensures all routes redirect to `index.html` for proper SPA routing.
+
+### Deploy to Netlify
+
+1. Push your code to GitHub
+2. Go to [Netlify](https://netlify.com) and import your repository
+3. Build settings:
+   - **Build command**: `npm run build`
+   - **Publish directory**: `dist`
+4. Add your environment variables in Site Settings → Environment Variables
+5. Deploy!
+
+The `netlify.toml` and `public/_redirects` files handle SPA routing automatically.
+
+### Other Platforms
+
+For other hosting platforms, configure your server to serve `index.html` for all routes. This is essential for Single Page Applications to work correctly.
+
+---
+
 ## 🐛 Troubleshooting
 
 ### Database Connection Errors
@@ -217,6 +251,15 @@ npm run lint     # Run ESLint
 ### Image Upload Fails
 - Ensure storage buckets are created and set to **public**
 - Check bucket names match: `meme-uploads`, `profile-pictures`, `banner-images`
+- **RLS Policy Error**: If you get "new row violates row-level security policy", run `fix_storage_policies.sql` in Supabase SQL Editor
+
+### 404 Error on Page Refresh
+This happens in production when you refresh a page or navigate directly to a URL. The issue is that the server doesn't know about client-side routes.
+
+**Solution:**
+- For **Vercel**: The `vercel.json` file is already configured to handle SPA routing
+- For **Netlify**: The `netlify.toml` and `public/_redirects` files are configured
+- For other hosts: Configure your server to serve `index.html` for all routes
 
 ### Admin Dashboard Shows Empty
 - Ensure you've set `is_admin = true` in the profiles table

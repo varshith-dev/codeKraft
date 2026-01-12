@@ -31,12 +31,12 @@ export default function Avatar({ src, alt = 'User', size = 'md', className = '',
     }
 
     const avatarContent = (
-        <div className={`relative ${sizeClasses[size]} ${className}`}>
+        <div className={`relative ${sizeClasses[size]} ${className} rounded-full overflow-hidden ring-2 ring-gray-200`}>
             {src ? (
                 <img
                     src={src}
                     alt={alt}
-                    className="w-full h-full rounded-full object-cover border-2 border-white shadow-sm"
+                    className="w-full h-full object-cover"
                     onError={(e) => {
                         // Fallback if image fails to load
                         e.target.style.display = 'none'
@@ -45,7 +45,7 @@ export default function Avatar({ src, alt = 'User', size = 'md', className = '',
                 />
             ) : null}
             <div
-                className={`${src ? 'hidden' : 'flex'} w-full h-full rounded-full items-center justify-center font-bold bg-gradient-to-br from-blue-500 to-purple-600 text-white border-2 border-white shadow-sm`}
+                className={`${src ? 'hidden' : 'flex'} w-full h-full items-center justify-center font-bold bg-gradient-to-br from-blue-500 to-purple-600 text-white`}
                 style={{ display: src ? 'none' : 'flex' }}
             >
                 {getInitials(alt)}
